@@ -5,22 +5,22 @@ from scipy.optimize import curve_fit
 # Ustawienia symulacji
 config = {
 	"leaguesNum": 5000, # liczba lig do symulacji
-	"teamsToGenerate": 16, # liczba drużyn do wygenerowania
-	"leagueToImport": "None", # drużyny z ligi "None" / "Ekstraklasa" / "La Liga" do importu
+	"teamsToGenerate": 16, # liczba drużyn do wygenerowania (ustawić 0 kiedy chcemy zaimportować)
+	"leagueToImport": "None", # drużyny z ligi "None" / "Ekstraklasa" / "La Liga" do zaimportowania
 	"histogramBinsNum": 25, # liczba klas w histogramie
 
-	"showMatchResults": False,
-	"showLeagueTable": False,
-	"showLeagueSummary": False,
-	"showAllLeaguesSummary": True,
-	"showHistogram": True,
-	"showFitFunction": True,
+	"showMatchResults": False, # wyświetlanie w konsoli wyników meczów
+	"showLeagueTable": False, # wyświetlanie w konsoli końcowej tabeli ligi
+	"showLeagueSummary": False, # wyświetlanie w konsoli podsumowaninia ligi
+	"showAllLeaguesSummary": True, # wyświetlenie w konsoli podsumowania wszystkich lig
+	"showHistogram": True, # wyświetlenie końcowego histogramu
+	"showFitFunction": True, # wyświetlenie w konsoli funkcji dopasowania wraz z parametrami
 
-	"saveDataToFile": True,
-	"saveHistogramToFile": True,
+	"saveDataToFile": True, # zapis danych (goli w ligach) do pliku
+	"saveHistogramToFile": True, # zapis histogramu do pliku
 
-	"dataFileName": "goals.txt",
-	"histogramFileName": "histogram.png"
+	"dataFileName": "goals.txt", # nazwa pliku do zapisu danych
+	"histogramFileName": "histogram.png" # nazwa pliku do zapisu histogramu
 }
 
 # Drużyny z lig do importu
@@ -64,7 +64,6 @@ leaguesToImport = {
 	"None": []
 }
 
-# Klasa pogody
 class Weather:
 	def __init__(self, type="Sunny", temperature=20.0, windSpeed=0):
 		self.type = type
@@ -81,7 +80,7 @@ class Weather:
 			"Foggy": 0.9, # Foggy
 			"Drizzle": 0.8, # Drizzle
 			"Rainy": 0.7, # Rainy
-			"Snowy": 0.75, # Snowy
+			"Snowy": 0.8, # Snowy
 			"Stormy": 0.5 # Stormy
 			}
 
@@ -104,23 +103,22 @@ class Weather:
 
 	def generateType(self):
 		self.weatherTypes = ["Sunny", "Cloudy", "Foggy", "Drizzle", "Rainy", "Snowy", "Stormy"]
-		self.weatherProbabilities = [0.55, 0.25, 0.07, 0.05, 0.05, 0.025, 0.005]
+		self.weatherProbabilities = [0.5, 0.25, 0.1, 0.05, 0.05, 0.04, 0.01]
 		self.type = np.random.choice(a=self.weatherTypes, p=self.weatherProbabilities)
 
 	def generateTemperature(self):
-		mean, stdDev = 10, 10
+		mean, stdDev = 15, 10
 		self.temperature = round(np.random.normal(mean, stdDev), 1)
 
 	def generateWindSpeed(self):
-		mean = 10
-		self.windSpeed = round(np.random.exponential(mean))
+		lam = 10
+		self.windSpeed = round(np.random.exponential(lam))
 
 	def generate(self):
 		self.generateType()
 		self.generateTemperature()
 		self.generateWindSpeed()
 
-# Klasa drużyny
 class Team:
 	def __init__(self, name = "Team", power = 0, matches = 0, wins = 0, draws = 0, losses = 0, goalsFor = 0, goalsAgainst = 0, points = 0):
 		self.name = name
@@ -144,7 +142,6 @@ class Team:
 	def __str__(self):
 		return f"{self.name}\t{self.power:.2f}\t{self.matches}|{self.wins}/{self.draws}/{self.losses}\t{self.goalsFor}/{self.goalsAgainst}/{self.goalDifference}|{self.avgGoals:.2f}\t{self.points}"
 
-# Klasa meczu
 class Match:
 	def __init__(self, home, away, homeGoals=0, awayGoals=0, weather=Weather()):
 		self.home = home
@@ -172,15 +169,15 @@ class Match:
 		away.matches += 1
 
 		# Losowanie liczby goli strzelonych przez każdą drużynę zależne od siły drużyny, kto jest gospodarzem i pogody
-		mean = 1.25
+		base = 1
 		self.homeBonus = 0.1
 		self.awayPenalty = -0.05
 
-		homeGoals = np.random.poisson(lam = (mean + home.power + self.homeBonus) * weather.goalChance)
+		homeGoals = np.random.poisson(lam = (base + home.power + self.homeBonus) * weather.goalChance)
 		home.goalsFor += homeGoals
 		away.goalsAgainst += homeGoals
 
-		awayGoals = np.random.poisson(lam = (mean + away.power + self.awayPenalty) * weather.goalChance)
+		awayGoals = np.random.poisson(lam = (base + away.power + self.awayPenalty) * weather.goalChance)
 		away.goalsFor += awayGoals
 		home.goalsAgainst += awayGoals
 
@@ -201,7 +198,6 @@ class Match:
 		self.homeGoals = homeGoals
 		self.awayGoals = awayGoals
 
-# Klasa ligi
 class League:
 	def __init__(self, name="League"):
 		self.name = name
@@ -264,7 +260,6 @@ class League:
 
 # Funkcja Gaussa
 def gaussian(x, a, mean, sigma):
-	if sigma == 0: return 0
 	return a * np.exp(-0.5 * ((x - mean) / sigma) ** 2)
 
 # Tworzy histogram z danych
@@ -277,7 +272,7 @@ def createHistogram(data, binsNum, fitFunction, title="", xlabel="", ylabel=""):
 
 	# Dopasowanie funkcji
 	parameters, covariance = curve_fit(fitFunction, binCenters, count, p0=[1, np.mean(data), np.std(data)])
-	parameters = tuple(round(param) for param in parameters)
+	parameters = tuple(round(param) for param in parameters) # zaokrąglanie parametrów
 
 	# Wartości dopasowanej funkcji
 	x_fit = np.linspace(min(data), max(data), 1000)
@@ -313,13 +308,14 @@ def writeDataToFile(data, fileName):
 # Symulacja wielu lig i zbieranie statystyk #
 # ----------------------------------------- #
 
-# Importowanie lig, jeśli wybrano
+# Importowanie dużyn z ligi, jeśli wybrano jakąś
 importedLeague = leaguesToImport[config["leagueToImport"]]
 
-if config['leaguesNum'] > 0 and config['teamsToGenerate'] + len(importedLeague) >= 2:
+if config['leaguesNum'] > 0 and config['teamsToGenerate'] + len(importedLeague) >= 2: # min 1 liga i 2 drużyny
 	goalsInLeagues = []
 	matchesInLeagues = []
 
+	# Symulacja lig
 	for i in range(config['leaguesNum']):
 		league = League()
 		if importedLeague: league.importTeams(importedLeague)
@@ -329,6 +325,7 @@ if config['leaguesNum'] > 0 and config['teamsToGenerate'] + len(importedLeague) 
 		goalsInLeagues.append(league.goals)
 		matchesInLeagues.append(league.matches)
 
+		# Tabela i podsumowanie ligi
 		if config['showLeagueTable']: league.showTable()
 		if config['showLeagueSummary']: league.showSummary()
 
@@ -336,16 +333,16 @@ if config['leaguesNum'] > 0 and config['teamsToGenerate'] + len(importedLeague) 
 	if config['showAllLeaguesSummary']:
 		allMatchesInLeagues = sum(matchesInLeagues)
 		allGoalsInLeagues = sum(goalsInLeagues)
+		avgGoalsInLeagues = allGoalsInLeagues / config['leaguesNum']
 		minGoalsInLeagues = min(goalsInLeagues)
 		maxGoalsInLeagues = max(goalsInLeagues)
 		rangeOfGoalsInLeagues = maxGoalsInLeagues - minGoalsInLeagues
-		avgGoalsInLeagues = allGoalsInLeagues / config['leaguesNum']
 		avgGoalsPerMatchInLeagues = allGoalsInLeagues / allMatchesInLeagues if allMatchesInLeagues > 0 else 0
 		avgTeamGoalsPerMatchInLeagues = avgGoalsPerMatchInLeagues / 2
 
 		print(f"\nAll ({config['leaguesNum']}) leagues summary:\nMatches: {allMatchesInLeagues}\nGoals: {allGoalsInLeagues}"
-		+ f"\nMin goals/league: {minGoalsInLeagues}\nMax goals/league: {maxGoalsInLeagues}\nRange goals/league: {rangeOfGoalsInLeagues}"
-		+ f"\nAvg goals/league: {round(avgGoalsInLeagues, 2)}\nAvg goals/match: {round(avgGoalsPerMatchInLeagues, 2)}\nAvg team goals/match: {round(avgTeamGoalsPerMatchInLeagues, 2)}")
+		+ f"\nAvg goals/league: {round(avgGoalsInLeagues, 2)}\nMin goals/league: {minGoalsInLeagues}\nMax goals/league: {maxGoalsInLeagues}"
+		+ f"\nRange goals/league: {rangeOfGoalsInLeagues}\nAvg goals/match: {round(avgGoalsPerMatchInLeagues, 2)}\nAvg team goals/match: {round(avgTeamGoalsPerMatchInLeagues, 2)}")
 
 	# Zapis danych do pliku
 	if config['saveDataToFile']:
